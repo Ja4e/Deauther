@@ -314,6 +314,30 @@ def fun(mon_interface):
 		finally:
 			kill(airodump_pid)
 
+def crack(mon_interface):
+	try:
+		bssid = input("Enter Bssid: ")
+		channel = input("Channel: ")
+		try:
+			os.system(f"kitty -e 'bash -c \"sudo airodump-ng --bssid {bssid} --channel {channel} -w psk {mon_interface}; exec bash\"'")
+		except:
+			print("quitting...")
+		print("converting cap to hash...")
+		print("check for the location of captured cap file")
+		capcture = input("captured cap file location: ")
+		try:
+			print("try install multicapconverter from https://github.com/s77rt/multicapconverter/tree/master \ngit clone that if not exist...")
+			os.system(f"python ~/multicapconverter/multicapconverter.py -i {capture} --group-by handshake -x hccapx --all")
+		except:
+			print("quitting")
+	except Exception as e:
+		print(f"An error has occurred {e}")
+	finally:
+		if mon_interface:
+			cleanup(airodump_pid, mon_interface)
+		else:
+			print("No monitor interface to cleanup.")
+
 def main():
 	a = input("crack or attack: ").lower()
 	airodump_pid = None
@@ -351,7 +375,11 @@ def main():
 					print(f"Error while running airodump-ng: {e}")
 				print("removing csv...")
 				os.remove(f"{OUTPUT_FILE}-01.csv")
-				fun(mon_interface)
+				a = input("crack or continue?: ").lower()
+				if a in ("crack", "1")
+					crack(mon_interface)
+				else:
+					fun(mon_interface)
 			elif a == "2":
 				fun(mon_interface)
 		except Exception as e:
@@ -362,30 +390,11 @@ def main():
 			else:
 				print("No monitor interface to cleanup.")
 	else:
-		try:
-			bssid = input("Enter Bssid: ")
-			channel = input("Channel: ")
-			print()
-			os.system("iwconfig")
-			interface = input("Interface converted to monitor: ")
-			mon_interface = startup(interface)
-			try:
-				os.system(f"kitty -e 'bash -c \"sudo airodump-ng --bssid {bssid} --channel {channel} -w psk {mon_interface}; exec bash\"'")
-			except:
-				print("quitting...")
-			print("converting cap to hash...")
-			try:
-				print("try install multicapconverter from https://github.com/s77rt/multicapconverter/tree/master \ngit clone that if not exist...")
-				os.system(f"python ~/multicapconverter/multicapconverter.py -i capture.cap --group-by handshake -x hccapx --all")
-			except:
-				print("quitting")
-		except Exception as e:
-			print(f"An error has occurred {e}")
-		finally:
-			if mon_interface:
-				cleanup(airodump_pid, mon_interface)
-			else:
-				print("No monitor interface to cleanup.")
+		print()
+		os.system("iwconfig")
+		interface = input("Interface converted to monitor: ")
+		mon_interface = startup(interface)
+		crack(mon_interface)
 
 if __name__ == "__main__":
 	main()
