@@ -315,50 +315,77 @@ def fun(mon_interface):
 			kill(airodump_pid)
 
 def main():
+	a = input("crack or attack: ").lower()
 	airodump_pid = None
 	mon_interface = None
-	try:
-		interface = input("Enter the network interface (e.g., wlan0): ").strip()
-		a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
-		if a in ("1"):
+	if a in ("attack","2"):
+		try:
+			interface = input("Enter the network interface (e.g., wlan0): ").strip()
+			a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
+			if a in ("1"):
+				mon_interface = startup(interface)
+				if Path(OUTPUT_FILE).exists():
+					os.remove(OUTPUT_FILE)
+				print(f"\nStarting airodump-ng, capturing all data to {OUTPUT_FILE}...")
+				airodump_command = [
+					"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+				]
+				print(f"Executing {airodump_command}")
+				airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				airodump_pid = airodump_proc.pid
+				print(f"airodump-ng started with PID {airodump_pid}")
+				try:
+					stdout, stderr = airodump_proc.communicate(timeout=10)
+					print("\n--- Command Output ---")
+					print(stdout.decode())
+					if stderr.strip():
+						print("\n--- Command Errors ---")
+						print(stderr.decode())
+				except subprocess.TimeoutExpired:
+					print("\nairodump-ng is running. You can stop it anytime.")
+					while True:
+						if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
+							kill(airodump_pid)
+							break
+				except Exception as e:
+					print(f"Error while running airodump-ng: {e}")
+				print("removing csv...")
+				os.remove(f"{OUTPUT_FILE}-01.csv")
+				fun(mon_interface)
+			elif a == "2":
+				fun(mon_interface)
+		except Exception as e:
+			print(f"An error occurred: {e}")
+		finally:
+			if mon_interface:
+				cleanup(airodump_pid, mon_interface)
+			else:
+				print("No monitor interface to cleanup.")
+	else:
+		try:
+			bssid = input("Enter Bssid: ")
+			channel = input("Channel: ")
+			print()
+			os.system("iwconfig")
+			interface = input("Interface converted to monitor: ")
 			mon_interface = startup(interface)
-			if Path(OUTPUT_FILE).exists():
-				os.remove(OUTPUT_FILE)
-			print(f"\nStarting airodump-ng, capturing all data to {OUTPUT_FILE}...")
-			airodump_command = [
-				"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
-			]
-			print(f"Executing {airodump_command}")
-			airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			airodump_pid = airodump_proc.pid
-			print(f"airodump-ng started with PID {airodump_pid}")
 			try:
-				stdout, stderr = airodump_proc.communicate(timeout=10)
-				print("\n--- Command Output ---")
-				print(stdout.decode())
-				if stderr.strip():
-					print("\n--- Command Errors ---")
-					print(stderr.decode())
-			except subprocess.TimeoutExpired:
-				print("\nairodump-ng is running. You can stop it anytime.")
-				while True:
-					if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
-						kill(airodump_pid)
-						break
-			except Exception as e:
-				print(f"Error while running airodump-ng: {e}")
-			print("removing csv...")
-			os.remove(f"{OUTPUT_FILE}-01.csv")
-			fun(mon_interface)
-		elif a == "2":
-			fun(mon_interface)
-	except Exception as e:
-		print(f"An error occurred: {e}")
-	finally:
-		if mon_interface:
-			cleanup(airodump_pid, mon_interface)
-		else:
-			print("No monitor interface to cleanup.")
+				os.system(f"kitty -e 'bash -c \"sudo airodump-ng --bssid {bssid} --channel {channel} -w psk {mon_interface}; exec bash\"'")
+			except:
+				print("quitting...")
+			print("converting cap to hash...")
+			try:
+				print("try install multicapconverter from https://github.com/s77rt/multicapconverter/tree/master \ngit clone that if not exist...")
+				os.system(f"python ~/multicapconverter/multicapconverter.py -i capture.cap --group-by handshake -x hccapx --all")
+			except:
+				print("quitting")
+		except Exception as e:
+			print(f"An error has occurred {e}")
+		finally:
+			if mon_interface:
+				cleanup(airodump_pid, mon_interface)
+			else:
+				print("No monitor interface to cleanup.")
 
 if __name__ == "__main__":
 	main()
