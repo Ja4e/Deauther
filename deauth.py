@@ -12,7 +12,7 @@ def check_req():
 		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty"]:
 			result = subprocess.run(["which", cmd], capture_output=True, text=True)
 			if result.returncode != 0:
-				print("sorry I tried to terminal-less, its ")
+				print("sorry I tried to terminal-less, its making the code too complex and unnecessary... if the issue is kitty not installed...")
 				print(f"Error: {cmd} is not installed or not in your PATH.")
 				sys.exit(1)
 		print("All required tools are installed.")
