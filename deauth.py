@@ -362,7 +362,7 @@ def main():
 			a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
 			if a in ("1"):
 				a = input("airodump all possible ap or single ap with handshake capture? (1 or 2):").lower()
-				if a in ("1","all")
+				if a in ("1","all"):
 					mon_interface = startup(interface)
 					if Path(OUTPUT_FILE).exists():
 						os.remove(OUTPUT_FILE)
