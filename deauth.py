@@ -270,7 +270,7 @@ def fun(mon_interface):
 					print(f"Removing output file {OUTPUT_FILE}-01.csv...")
 					os.remove(f"{OUTPUT_FILE}-01.csv")
 				airodump_command = [
-					"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", "--bssid", bssid, "--channel", channel, mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+					"sudo", "airodump-ng", "--manufacturer","--uptime", "--wps", "--beacons", "--band", "abg", "--bssid", bssid, "--channel", channel, mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv", "--write-interval", "1"
 				]
 				print(f"Executing {airodump_command}")
 				airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -300,6 +300,9 @@ def fun(mon_interface):
 				
 			a = input(print("Deauth a client? or quit: ")).lower()
 			if a in ("yes","y", "1"):
+				a = input("Launch a terminal for capturing handshake?: ").lower()
+				if a in ("yes","y","1"):
+					capture_handshake(bssid, channel, mon_interface)
 				essid = input("essid: ")
 				while True:
 					if deauth_client(bssid, channel,essid,mon_interface) == 0:
@@ -338,6 +341,17 @@ def crack(mon_interface):
 		else:
 			print("No monitor interface to cleanup.")
 
+def capture_handshake(bssid, channel, mon_interface):
+	try:
+		write=input("where do you want to write the captured handshake file?(~/Download): ")
+		os.system(f"kitty -e 'bash -c \"sudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --ivs --write {write}; exec bash \"'")
+		print("launcing new terminal kitty \nsudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --ivs --write {write}")
+		print("Little tip:\n")
+		print("r activate realtime sorting - applies sorting algorithm every time the display will be redrawn \n's' Change  column to	sort by, which currently includes: First seen; BSSID; PWR level;	Beacons; Data packets; Packet  rate;  Channel; Max. datarate; Encryption; Strongest Ciphersuite; Strongest Authentication; ESSID \n'SPACE'  Pause display redrawing/ Resume redrawing")
+	except Exception as e:
+		print(f"An error has occurred {e}")
+	
+
 def main():
 	a = input("crack or attack: ").lower()
 	airodump_pid = None
@@ -347,40 +361,48 @@ def main():
 			interface = input("Enter the network interface (e.g., wlan0): ").strip()
 			a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
 			if a in ("1"):
-				mon_interface = startup(interface)
-				if Path(OUTPUT_FILE).exists():
-					os.remove(OUTPUT_FILE)
-				print(f"\nStarting airodump-ng, capturing all data to {OUTPUT_FILE}...")
-				airodump_command = [
-					"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
-				]
-				print(f"Executing {airodump_command}")
-				airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				airodump_pid = airodump_proc.pid
-				print(f"airodump-ng started with PID {airodump_pid}")
-				try:
-					stdout, stderr = airodump_proc.communicate(timeout=10)
-					print("\n--- Command Output ---")
-					print(stdout.decode())
-					if stderr.strip():
-						print("\n--- Command Errors ---")
-						print(stderr.decode())
-				except subprocess.TimeoutExpired:
-					print("\nairodump-ng is running. You can stop it anytime.")
-					while True:
-						if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
-							kill(airodump_pid)
-							break
-				except Exception as e:
-					print(f"Error while running airodump-ng: {e}")
-				print("removing csv...")
-				os.remove(f"{OUTPUT_FILE}-01.csv")
-				a = input("crack or continue?: ").lower()
-				if a in ("crack", "1")
-					crack(mon_interface)
-				else:
-					fun(mon_interface)
+				a = input("airodump all possible ap or single ap with handshake capture? (1 or 2):").lower()
+				if a in ("1","all")
+					mon_interface = startup(interface)
+					if Path(OUTPUT_FILE).exists():
+						os.remove(OUTPUT_FILE)
+					print(f"\nStarting airodump-ng, capturing all data to {OUTPUT_FILE}...")
+					airodump_command = [
+						"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+					]
+					print(f"Executing {airodump_command}")
+					airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+					airodump_pid = airodump_proc.pid
+					print(f"airodump-ng started with PID {airodump_pid}")
+					try:
+						stdout, stderr = airodump_proc.communicate(timeout=10)
+						print("\n--- Command Output ---")
+						print(stdout.decode())
+						if stderr.strip():
+							print("\n--- Command Errors ---")
+							print(stderr.decode())
+					except subprocess.TimeoutExpired:
+						print("\nairodump-ng is running. You can stop it anytime.")
+						while True:
+							if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
+								kill(airodump_pid)
+								break
+					except Exception as e:
+						print(f"Error while running airodump-ng: {e}")
+					print("removing csv...")
+					os.remove(f"{OUTPUT_FILE}-01.csv")
+					a = input("crack or continue?: ").lower()
+					if a in ("crack", "1"):
+						crack(mon_interface)
+					else:
+						fun(mon_interface)
+				elif a in ("2", "ap", "single"):
+					mon_interface = startup(interface)
+					bssid = input("bssid: ")
+					channel = input("channel: ")
+					capture_handshake(bssid, channel, mon_interface)
 			elif a == "2":
+				mon_interface = startup(interface)
 				fun(mon_interface)
 		except Exception as e:
 			print(f"An error occurred: {e}")
@@ -389,12 +411,14 @@ def main():
 				cleanup(airodump_pid, mon_interface)
 			else:
 				print("No monitor interface to cleanup.")
-	else:
+	elif a in ("crack","1"):
 		print()
 		os.system("iwconfig")
 		interface = input("Interface converted to monitor: ")
 		mon_interface = startup(interface)
 		crack(mon_interface)
+	else:
+		print("exiting... incorrect option selected")
 
 if __name__ == "__main__":
 	main()
