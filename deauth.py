@@ -9,9 +9,10 @@ OUTPUT_FILE = "/tmp/airodump_full_output"
 
 def check_req():
 	try:
-		for cmd in ["aircrack-ng", "iwconfig", "systemctl", "kitty"]:
+		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty"]:
 			result = subprocess.run(["which", cmd], capture_output=True, text=True)
 			if result.returncode != 0:
+				print("sorry I tried to terminal-less, its ")
 				print(f"Error: {cmd} is not installed or not in your PATH.")
 				sys.exit(1)
 		print("All required tools are installed.")
