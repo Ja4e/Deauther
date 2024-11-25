@@ -12,7 +12,7 @@ def check_req():
 		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty"]:
 			result = subprocess.run(["which", cmd], capture_output=True, text=True)
 			if result.returncode != 0:
-				print("sorry I tried to terminal-less, its ")
+				print("sorry I tried to terminal-less, its making the code too complex and unnecessary... if the issue is kitty not installed...")
 				print(f"Error: {cmd} is not installed or not in your PATH.")
 				sys.exit(1)
 		print("All required tools are installed.")
@@ -377,9 +377,10 @@ def main():
 					]
 					if b in ("yes", "y"):
 						essid = input("essid: ")
-						airodump_command = [
+						airodump_command2 = [
 						"sudo", "airodump-ng", "--manufacturer", "--wps", "--showack", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv", "--essid", essid
-					]
+						]
+						airodump_command=airodump_command2
 					print(f"Executing {airodump_command}")
 					airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 					airodump_pid = airodump_proc.pid
@@ -397,12 +398,12 @@ def main():
 							if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
 								a = input("Save output file?: ")
 								if a in ("yes", "y", "1"):
+									print("saving to ~/Downloads...")
 									os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
 								kill(airodump_pid)
 								break
 					except Exception as e:
 						print(f"Error while running airodump-ng: {e}")
-					a = input("save csv?: ")
 					print("removing csv...")
 					os.remove(f"{OUTPUT_FILE}-01.csv")
 					a = input("crack or continue?: ").lower()
