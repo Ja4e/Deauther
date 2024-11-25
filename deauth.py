@@ -12,7 +12,7 @@ def check_req():
 		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty"]:
 			result = subprocess.run(["which", cmd], capture_output=True, text=True)
 			if result.returncode != 0:
-				print("sorry I tried to terminal-less, its making the code too complex and unnecessary... if the issue is kitty not installed...")
+				print("sorry I tried to terminal-less, its ")
 				print(f"Error: {cmd} is not installed or not in your PATH.")
 				sys.exit(1)
 		print("All required tools are installed.")
@@ -290,6 +290,8 @@ def fun(mon_interface):
 				print("Displaying live data...")
 				while True:
 					if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
+						if a in ("yes", "y", "1"):
+							os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
 						os.kill(airodump_pid, 9)
 						break
 				command_str = " ".join(airodump_command)
@@ -359,17 +361,24 @@ def main():
 	mon_interface = None
 	if a in ("attack","2"):
 		try:
+			os.system("iwconfig")
 			interface = input("Enter the network interface (e.g., wlan0): ").strip()
 			a = input("airodump or directly jump into aireplay (1 or 2): ").lower()
 			if a in ("1"):
 				a = input("airodump all possible ap or single ap with handshake capture? (1 or 2):").lower()
 				if a in ("1","all"):
+					b = input("airodump a specific client?: ")
 					mon_interface = startup(interface)
 					if Path(OUTPUT_FILE).exists():
 						os.remove(OUTPUT_FILE)
 					print(f"\nStarting airodump-ng, capturing all data to {OUTPUT_FILE}...")
 					airodump_command = [
-						"sudo", "airodump-ng", "--manufacturer", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+						"sudo", "airodump-ng", "--manufacturer", "--wps", "--showack", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv"
+					]
+					if b in ("yes", "y"):
+						essid = input("essid: ")
+						airodump_command = [
+						"sudo", "airodump-ng", "--manufacturer", "--wps", "--showack", "--beacons", "--band", "abg", mon_interface, "--write", OUTPUT_FILE, "--output-format", "csv", "--essid", essid
 					]
 					print(f"Executing {airodump_command}")
 					airodump_proc = subprocess.Popen(airodump_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -386,10 +395,14 @@ def main():
 						print("\nairodump-ng is running. You can stop it anytime.")
 						while True:
 							if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
+								a = input("Save output file?: ")
+								if a in ("yes", "y", "1"):
+									os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
 								kill(airodump_pid)
 								break
 					except Exception as e:
 						print(f"Error while running airodump-ng: {e}")
+					a = input("save csv?: ")
 					print("removing csv...")
 					os.remove(f"{OUTPUT_FILE}-01.csv")
 					a = input("crack or continue?: ").lower()
