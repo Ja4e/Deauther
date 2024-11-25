@@ -9,7 +9,7 @@ OUTPUT_FILE = "/tmp/airodump_full_output"
 
 def check_req():
 	try:
-		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty"]:
+		for cmd in ["aircrack-ng", "iwconfig", "systemctl","kitty" ,"cp"]:
 			result = subprocess.run(["which", cmd], capture_output=True, text=True)
 			if result.returncode != 0:
 				print("sorry I tried to terminal-less, its making the code too complex and unnecessary... if the issue is kitty not installed...")
@@ -396,11 +396,16 @@ def main():
 						print("\nairodump-ng is running. You can stop it anytime.")
 						while True:
 							if display_table(f"{OUTPUT_FILE}-01.csv") == 0:
-								a = input("Save output file?: ")
-								if a in ("yes", "y", "1"):
-									print("saving to ~/Downloads...")
-									os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
-								kill(airodump_pid)
+								try:
+									a = input("Save output file?: ")
+									if a in ("yes", "y", "1"):
+										print("saving to ~/Downloads...")
+										os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
+									else:
+										print("continuing...")
+									kill(airodump_pid)
+								except:
+									print("Error saving files")
 								break
 					except Exception as e:
 						print(f"Error while running airodump-ng: {e}")
