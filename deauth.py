@@ -199,10 +199,10 @@ def deauth_ap(bssid, channel, mon_interface):
 		
 	except KeyboardInterrupt:
 		kill(airodump_pid)
-		return
+		return 0
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-		return
+		return 0
 
 def deauth_client(bssid, channel, essid, mon_interface):
 	print(f"Deauthenticating client {essid} on AP {bssid} at channel {channel}...")
@@ -245,10 +245,10 @@ def deauth_client(bssid, channel, essid, mon_interface):
 		
 	except KeyboardInterrupt:
 		kill(airodump_pid)
-		return
+		return 0
 	except Exception as e:
 		print(f"\nAn error occurred while executing the command: {e}")
-		return
+		return 0
 
 def clients(mon_interface, bssid, channel):
 	a = input("Deauth client? (1(yes )or 2(no)): ").lower()
@@ -265,7 +265,9 @@ def fun(mon_interface):
 			channel = input("Your chosen Channel: ")
 			a = input("Deauth the whole AP or Keep Dumping specific AP? (1 or 2) (q to quit)")
 			if a == "1":
-				deauth_ap(bssid, channel, mon_interface)
+				if deauth_ap(bssid, channel, mon_interface) == 0:
+					os.kill(airodump_pid, 9)
+					print("quitting...")
 			elif a == "2":
 				if Path(f"{OUTPUT_FILE}-01.csv").exists():
 					print(f"Removing output file {OUTPUT_FILE}-01.csv...")
