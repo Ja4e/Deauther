@@ -447,4 +447,10 @@ def main():
 		print("exiting... incorrect option selected")
 
 if __name__ == "__main__":
-	main()
+	try:
+		main()
+	except KeyboardInterrupt:
+		print("\n Quitting...")
+		print("Adios!")
+	except Exception as e:
+		Print(f"An error occurred: {e}")
