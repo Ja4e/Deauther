@@ -348,11 +348,14 @@ def crack(mon_interface):
 
 def capture_handshake(bssid, channel, mon_interface):
 	try:
+		write="~/Download"
+		print("Please specify the location")
 		write=input("where do you want to write the captured handshake file?(~/Download): ")
-		os.system(f"kitty -e 'bash -c \"sudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --ivs --write {write}; exec bash \"'")
-		print("launcing new terminal kitty \nsudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --ivs --write {write}")
+		os.system(f"kitty -e 'bash -c \"sudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --write {write} --output-format pcap; exec bash \"'")
+		print(f"launcing new terminal kitty \nsudo airodump-ng --manufacturer --beacons --wps --band abg --bssid {bssid} --channel {channel} wlan1 --ivs --write {write}")
 		print("Little tip:\n")
 		print("r activate realtime sorting - applies sorting algorithm every time the display will be redrawn \n's' Change  column to	sort by, which currently includes: First seen; BSSID; PWR level;	Beacons; Data packets; Packet  rate;  Channel; Max. datarate; Encryption; Strongest Ciphersuite; Strongest Authentication; ESSID \n'SPACE'  Pause display redrawing/ Resume redrawing")
+		print("If using pcap file to be converted to hashcat readable format try use this github repo and git clone: \nhttps://github.com/ZerBea/hcxtools\n and then interact with it... have fun!")
 	except Exception as e:
 		print(f"An error has occurred {e}")
 	
@@ -405,9 +408,10 @@ def main():
 										os.system(f"sudo cp {OUTPUT_FILE}-01.csv ~/Downloads")
 									else:
 										print("continuing...")
-									kill(airodump_pid)
 								except:
 									print("Error saving files")
+								finally:
+									kill(airodump_pid)
 								break
 					except Exception as e:
 						print(f"Error while running airodump-ng: {e}")
