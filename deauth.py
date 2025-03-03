@@ -453,4 +453,4 @@ if __name__ == "__main__":
 		print("\n Quitting...")
 		print("Adios!")
 	except Exception as e:
-		Print(f"An error occurred: {e}")
+		print(f"An error occurred: {e}")
